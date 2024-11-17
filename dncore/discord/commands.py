@@ -2,14 +2,13 @@ import asyncio
 import re
 from logging import getLogger
 from pathlib import Path
-from typing import Awaitable, Any
-from typing import Callable
+from typing import Awaitable, Any, Callable
 
 import discord
 
 from dncore.abc.serializables import Embed
 from dncore.appconfig.commands import CommandCategory
-from dncore.command import DEFAULT_OWNER_GROUP, CommandContext, oncommand, CommandManager, DEFAULT_GUILD_OWNER_GROUP
+from dncore.command import DEFAULT_OWNER_GROUP, CommandContext, oncommand, CommandManager, DEFAULT_GUILD_ADMIN_GROUP
 from dncore.command.errors import CommandUsageError
 from dncore.discord.events import *
 from dncore.event import EventListener, onevent
@@ -182,7 +181,7 @@ class DNCoreCommands(EventListener):
 
         return Embed.info(self.lang.clean.deleted).format(dict(count=count))
 
-    @oncommand(defaults=DEFAULT_GUILD_OWNER_GROUP)
+    @oncommand(defaults=DEFAULT_GUILD_ADMIN_GROUP)
     async def cmd_setting(self, ctx: CommandContext):
         mode = ctx.arguments.get(0, "info").lower()
 

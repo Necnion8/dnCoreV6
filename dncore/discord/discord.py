@@ -6,7 +6,7 @@ from aiohttp import ClientResponse
 
 from dncore.abc.serializables import Embed, Emoji
 from dncore.appconfig.config import DiscordSection, CleanSection
-from dncore.command import CommandContext, CommandHandler, DEFAULT_GUILD_OWNER_GROUP, DEFAULT_DEFAULT_GROUP
+from dncore.command import CommandContext, CommandHandler, DEFAULT_GUILD_ADMIN_GROUP, DEFAULT_DEFAULT_GROUP
 from dncore.command.argument import Argument
 from dncore.command.errors import *
 from dncore.command.events import *
@@ -341,10 +341,19 @@ class DiscordClient(discord.Client):
             except (Exception,):
                 log.debug("Exception in error reports to owner", exc_info=True)
 
-    def _check_guild_owner_permission(self, command: CommandHandler, user: discord.User, guild: discord.Guild | None):
-        if guild and guild.owner_id == user.id:
-            if command.allow_group == DEFAULT_GUILD_OWNER_GROUP:
-                return self.commands.allowed_in_group(command, DEFAULT_GUILD_OWNER_GROUP)
+    def _check_guild_admin_permission(self, command: CommandHandler, user: discord.User, guild: discord.Guild | None):
+        if not guild:
+            return False
+
+        is_admins = guild.owner_id == user.id
+        if isinstance(user, discord.Member):
+            # noinspection PyUnresolvedReferences
+            if user.guild_permissions.administrator:
+                is_admins = True
+
+        if is_admins and command.allow_group == DEFAULT_GUILD_ADMIN_GROUP:
+            return self.commands.allowed_in_group(command, DEFAULT_GUILD_ADMIN_GROUP)
+
         return False
 
     def allowed(self, command: str | CommandHandler, author: discord.User, guild: discord.Guild | None):
@@ -360,7 +369,7 @@ class DiscordClient(discord.Client):
 
         # check permission
         if self.config.owner_id != author.id:
-            if not self._check_guild_owner_permission(command, author, guild):
+            if not self._check_guild_admin_permission(command, author, guild):
                 if not self.commands.allowed(command, user_id=author.id, role_id=role_ids):
                     if not self.commands.allowed_in_group(command, DEFAULT_DEFAULT_GROUP):
                         return False
