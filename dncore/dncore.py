@@ -30,7 +30,7 @@ from dncore.util.logger import DaysRotatingFileHandler, PackageNameInserter, Red
 
 __version__ = "6.1.0"
 __date__ = "2024/07/24"
-version_info = Version.parse(__version__ + "/" + __date__[2:].replace("/", ""))
+version_info = Version.parse(__version__ + "/" + __date__.replace("/", ""))
 __all__ = ["DNCore", "__version__", "__date__", "version_info", "DNCoreAPI"]
 log = logging.getLogger(__name__)
 T = TypeVar("T")
