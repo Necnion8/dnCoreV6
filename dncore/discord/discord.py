@@ -10,7 +10,7 @@ from dncore.command import CommandContext, CommandHandler, DEFAULT_GUILD_ADMIN_G
 from dncore.command.argument import Argument
 from dncore.command.errors import *
 from dncore.command.events import *
-from dncore.discord.events import EVENTS, DiscordGenericEvent, HelpCommandPreExecuteEvent
+from dncore.discord.events import EVENTS, DiscordGenericEvent, HelpCommandPreExecuteEvent, HelpCommandExecuteEvent
 from dncore.discord.overrides import replace_overrides
 from dncore.util import traceback_simple_format, safe_format
 from dncore.util.discord import get_intent_names
@@ -391,6 +391,9 @@ class DiscordClient(discord.Client):
             return
 
         m = self.m.help
+        command = e.command
+        name = e.name
+        args = e.args
 
         if command is None:
             return await context.send_warn(m.unknown_command)
@@ -414,7 +417,11 @@ class DiscordClient(discord.Client):
         if aliases:
             embed.add_field(name="別名:", value="`" + "`, `".join(aliases) + "`", inline=False)
 
-        return await context.send_info(embed)
+        e = await call_event(HelpCommandExecuteEvent(context, context.author, command, name, args, embed))
+        if e.cancelled:
+            return
+
+        return await context.send_info(e.embed)
 
     def clean_auto(self, message: discord.Message, delay: float = None, *, is_error=False):
         """

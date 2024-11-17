@@ -96,7 +96,7 @@ class DNCoreCommands(EventListener):
         if ctx.arguments:
             args = ctx.arguments
             name = args.pop(0)
-            return await get_core().client.send_command_usage(ctx, name, None)
+            return await get_core().client.send_command_usage(ctx, name, None, args)
 
         # list
         commands = [name for name in cmd.get_commands(type(ctx.channel))
