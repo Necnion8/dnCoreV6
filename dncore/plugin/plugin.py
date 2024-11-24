@@ -55,27 +55,26 @@ class PluginInfo:
     # PACKAGES = {}
     ALLOW_NAME = re.compile(r"^[a-zA-Z0-9_]+$")
 
-    def __init__(self, name, *, main, version, loader, plugin_data_dir):
-        """
-        :type name: str
-        :type main: str
-        :type version: Version
-        :type loader: PluginLoader
-        :type plugin_data_dir: Path
-        """
+    def __init__(self, name: str, *,
+                 main: str, version: Version, loader: "PluginLoader", plugin_data_dir: Path,
+                 authors: list[str] = None, depends: list[str] = None, softdepends: list[str] = None,
+                 libraries: list[str] = None, target_dncore: Version = None, resource_files: list[str] = None,
+                 description: str = None, changelog: dict[str, str] = None,
+                 ):
         if PluginInfo.ALLOW_NAME.fullmatch(name) is None:
             raise ValueError(f"Invalid plugin name: {name}")
 
         self.name = name
         self.main = main
         self.version = version
-        self.authors: list[str] = []
-        self.depends: list[str] = []
-        self.libraries: list[str] = []
-        self.target_dncore: Optional[Version] = None
-        self.resource_files: list[str] = []
-        self.description = None  # type: str | None
-        self.changelog = None  # type: dict[str, str] | None
+        self.authors = [] if authors is None else authors  # type: list[str]
+        self.depends = [] if depends is None else depends  # type: list[str]
+        self.softdepends = [] if softdepends is None else softdepends  # type: list[str]
+        self.libraries = [] if libraries is None else libraries  # type: list[str]
+        self.target_dncore = target_dncore
+        self.resource_files = [] if resource_files is None else resource_files  # type: list[str]
+        self.description = description
+        self.changelog = changelog
 
         self.instance: Optional[Plugin] = None
         self.enabled = False
@@ -129,6 +128,9 @@ class PluginInfo:
         if self.depends:
             serialized["depends"] = self.depends
 
+        if self.softdepends:
+            serialized["softdepends"] = self.softdepends
+
         if self.libraries:
             serialized["libraries"] = self.libraries
 
@@ -155,6 +157,7 @@ class PluginInfo:
                 authors.insert(0, data["author"])
             info.authors = [author for author in authors if isinstance(author, str)]
             info.depends = [depend for depend in data.get("depends", []) if isinstance(depend, str)]
+            info.softdepends = [dep for dep in data.get("softdepends", []) if isinstance(dep, str)]
             # info.loader = PluginModuleLoader(PluginInfo.EXTENSIONS_ROOT, info, extension_dir)
             if "libraries" in data:
                 info.libraries = data["libraries"]
@@ -724,16 +727,18 @@ class PluginManager(object):
         _checks = list(selected)
         while _checks:
             target = _checks.pop(0)
-            if target.depends:
-                _p_entries = [selected.index(_selected[depend_name])
-                              for depend_name in target.depends if depend_name in _selected]
-                if not _p_entries:
-                    continue
+            if not (target_depends := {*target.depends, *target.softdepends}):
+                continue
 
-                priority_index = min(_p_entries)
-                if selected.index(target) < priority_index + 1:
-                    selected.remove(target)
-                    selected.insert(priority_index + 1, target)
+            _p_entries = [selected.index(_selected[depend_name])
+                          for depend_name in target_depends if depend_name in _selected]
+            if not _p_entries:
+                continue
+
+            priority_index = min(_p_entries)
+            if selected.index(target) < priority_index + 1:
+                selected.remove(target)
+                selected.insert(priority_index + 1, target)
 
         return selected
 

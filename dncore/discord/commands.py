@@ -470,10 +470,16 @@ class DNCoreCommands(EventListener):
                     source_file = source_file.name if source_file else None
             source = f" ({source_file})" if source_file else ""
 
+            _depends_lines = []
+            if plugin.depends:
+                _depends_lines.append(":white_small_square: Depends: " + ", ".join(plugin.depends))
+            if plugin.softdepends:
+                _depends_lines.append(":white_small_square: SoftDepends: " + ", ".join(plugin.softdepends))
             description_lines = [
                 f":white_small_square: Version: **{plugin.version}**",
                 f":white_small_square: Status: **{state}**",
                 f":white_small_square: Loader: {type(plugin.loader).__name__}{source}",
+                *_depends_lines,
                 f":white_small_square: Commands: {', '.join(commands)}",
             ]
 
