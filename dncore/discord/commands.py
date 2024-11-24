@@ -334,13 +334,13 @@ class DNCoreCommands(EventListener):
 
         # Plugin Manage: info, enable, disable
         {prefix}{name} pmi (plugin)
-        {prefix}{name} pme (plugin)
-        {prefix}{name} pmd (plugin)
+        {prefix}{name} pme (plugin) [-f]
+        {prefix}{name} pmd (plugin) [-f]
         # Plugin Manage: load, unload, reload
-        {prefix}{name} pml (plugin.dcp)
-        {prefix}{name} pml (/extension)
-        {prefix}{name} pmu (plugin)
-        {prefix}{name} pmr (plugin)
+        {prefix}{name} pml (plugin.dcp) [-f]
+        {prefix}{name} pml (/extension) [-f]
+        {prefix}{name} pmu (plugin) [-f]
+        {prefix}{name} pmr (plugin) [-f]
 
         # Plugin To File: toPlugin, toExtension
         {prefix}{name} pm2p (plugin) [fileExtraName]
@@ -492,6 +492,7 @@ class DNCoreCommands(EventListener):
                 plugin = plmgr.get_plugin_info(ctx.arguments[1])
             except IndexError:
                 return Embed.warn(":grey_exclamation: プラグインを指定してください。")
+            force = ctx.arguments.get(2) == "-f"
 
             if not plugin:
                 return Embed.error(":grey_exclamation: プラグインが見つかりません。")
@@ -501,7 +502,7 @@ class DNCoreCommands(EventListener):
 
             try:
                 async with ctx.typing():
-                    res = await plmgr.enable_plugin(plugin)
+                    res = await plmgr.enable_plugin(plugin, ignore_depends=force)
             except PluginException as e:
                 return Embed.error(f":exclamation: エラー: {e}")
 
@@ -516,6 +517,7 @@ class DNCoreCommands(EventListener):
                 plugin = plmgr.get_plugin_info(ctx.arguments[1])
             except IndexError:
                 return Embed.warn(":grey_exclamation: プラグインを指定してください。")
+            force = ctx.arguments.get(2) == "-f"
 
             if not plugin:
                 return Embed.error(":grey_exclamation: プラグインが見つかりません。")
@@ -525,7 +527,7 @@ class DNCoreCommands(EventListener):
 
             try:
                 async with ctx.typing():
-                    res = await plmgr.disable_plugin(plugin)
+                    res = await plmgr.disable_plugin(plugin, ignore_depends=force)
             except PluginException as e:
                 return Embed.error(f":exclamation: エラー: {e}")
 
@@ -539,13 +541,14 @@ class DNCoreCommands(EventListener):
                 plugin = plmgr.get_plugin_info(ctx.arguments[1])
             except IndexError:
                 return Embed.warn(":grey_exclamation: プラグインを指定してください。")
+            force = ctx.arguments.get(2) == "-f"
 
             if not plugin:
                 return Embed.error(":grey_exclamation: プラグインが見つかりません。")
 
             try:
                 async with ctx.typing():
-                    info = await plmgr.reload_plugin(plugin)
+                    info = await plmgr.reload_plugin(plugin, ignore_depends=force)
 
             except PluginException as e:
                 return Embed.error(f":exclamation: エラー: {e}")
@@ -562,7 +565,8 @@ class DNCoreCommands(EventListener):
 
         elif mode in ("pml", "pmload"):
             args = ctx.arguments
-            args.pop(0)
+            args.pop(0)  # remove mode arg
+            force = bool(args and args[-1] == "-f" and args.pop(-1))
             _filename = " ".join(args)
             if not _filename:
                 return Embed.warn(":grey_exclamation: ファイル名を指定してください。")
@@ -617,10 +621,10 @@ class DNCoreCommands(EventListener):
 
             try:
                 async with ctx.typing():
-                    info = await plmgr.load_plugin(info.loader, info)
+                    info = await plmgr.load_plugin(info.loader, info, ignore_depends=force)
                     if not info:
                         raise PluginOperationError("Failed to load info")
-                    res = await plmgr.enable_plugin(info)
+                    res = await plmgr.enable_plugin(info, ignore_depends=force)
                     if res:
                         cmdmgr.remap()
 
@@ -637,6 +641,7 @@ class DNCoreCommands(EventListener):
                 plugin = plmgr.get_plugin_info(ctx.arguments[1])
             except IndexError:
                 return Embed.warn(":grey_exclamation: プラグインを指定してください。")
+            force = ctx.arguments.get(2) == "-f"
 
             if not plugin:
                 return Embed.error(":grey_exclamation: プラグインが見つかりません。")
@@ -644,9 +649,9 @@ class DNCoreCommands(EventListener):
             try:
                 if plugin.enabled:
                     async with ctx.typing():
-                        await plmgr.disable_plugin(plugin)
+                        await plmgr.disable_plugin(plugin, ignore_depends=force)
 
-                await plmgr.unload_plugin(plugin)
+                await plmgr.unload_plugin(plugin, ignore_depends=force)
 
             except PluginException as e:
                 return Embed.error(f":exclamation: エラー: {e}")

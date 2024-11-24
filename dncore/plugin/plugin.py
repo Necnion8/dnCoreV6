@@ -883,7 +883,8 @@ class PluginManager(object):
         if info.enabled:
             if not ignore_depends:
                 def _check_dep(pi: PluginInfo):
-                    return pi.enabled and any(1 for dep in {*pi.depends, *pi.softdepends} if info.name.lower() == dep)
+                    return pi.enabled and any(1 for dep in {*pi.depends, *pi.softdepends}
+                                              if info.name.lower() == dep.lower())
 
                 if depends := [pi.name for pi in self.plugins.values() if _check_dep(pi)]:
                     raise PluginDependencyError("depends on: " + ", ".join(depends))
@@ -961,7 +962,8 @@ class PluginManager(object):
 
         if not ignore_depends:
             def _check_dep(pi: PluginInfo):
-                return pi.enabled and any(1 for dep in {*pi.depends, *pi.softdepends} if info.name.lower() == dep)
+                return pi.enabled and any(1 for dep in {*pi.depends, *pi.softdepends}
+                                          if info.name.lower() == dep.lower())
 
             if depends := [pi.name for pi in self.plugins.values() if _check_dep(pi)]:
                 raise PluginDependencyError("depends on: " + ", ".join(depends))
