@@ -742,6 +742,43 @@ class PluginManager(object):
 
         return selected
 
+    def get_depends(self, plugin_info: PluginInfo, *,
+                    require_enabled=False) -> tuple[set[PluginInfo], set[str], set[str]]:
+        """
+        プラグインに必要なプラグインを返します
+
+        返す値は、PluginInfo 不足してるsoftdepend 不足してるdepend の３つの値をタプルで返します
+
+        :param plugin_info: 検証するプラグイン
+        :param require_enabled: 対象のプラグインは有効化されている必要があります
+        """
+        depends = set()
+        unknown_depends = set()
+        unknown_softdepends = set()
+
+        for depend in plugin_info.depends:
+            try:
+                info = self.plugins[depend.lower()]
+                if require_enabled and not info.enabled:
+                    raise KeyError
+            except KeyError:
+                unknown_depends.add(depend)
+            else:
+                depends.add(info)
+
+        for depend in plugin_info.softdepends:
+            try:
+                info = self.plugins[depend.lower()]
+                if require_enabled and not info.enabled:
+                    raise KeyError
+            except KeyError:
+                if depend not in plugin_info.depends:
+                    unknown_softdepends.add(depend)
+            else:
+                depends.add(info)
+
+        return depends, unknown_softdepends, unknown_depends
+
     def load_plugins(self, *, ignore_names: list[str] = None):
         self.plugins.clear()
         _ignore_names = [n.lower() for n in ignore_names] if ignore_names else []
@@ -754,10 +791,15 @@ class PluginManager(object):
 
             self.plugins[info.name.lower()] = info
             try:
+                _, __, no_deps = self.get_depends(info)
+                if no_deps:
+                    raise PluginDependencyError(", ".join(no_deps), depends=list(no_deps))
                 info.load()
+
             except PluginException as e:
-                log.error(f"プラグイン {info.name} を初期化できません: {e}")
+                log.error(f"プラグイン {info.name} を初期化できません: {type(e).__name__}: {e}")
                 info.load_exception = e
+
             except Exception as e:
                 log.exception(f"プラグイン {info.name} を初期化できません。")
                 info.load_exception = e
@@ -769,25 +811,32 @@ class PluginManager(object):
         for pi in list(self.plugins.values()):
             r = pi.enabled
             if not pi.enabled and pi.instance:
-                r = await self.enable_plugin(pi)
+                try:
+                    r = await self.enable_plugin(pi)
+                except PluginException as e:
+                    log.error(f"プラグイン {pi.name} を初期化できません: {type(e).__name__}: {e}")
+                    r = False
+                except Exception as e:
+                    log.exception(f"プラグイン {pi} を初期化できません。", exc_info=e)
+                    r = False
             results[not r].append(pi)
 
         log.info("プラグイン %s個を有効化しました。%s", len(results[0]), f" (エラー: {len(results[1])})" if results[1] else "")
         return results
 
-    async def disable_plugins(self):
+    async def disable_plugins(self, *, ignore_depends=True):
         log.debug("Disabling plugins")
 
         for pi in reversed(list(self.plugins.values())):
             if pi.enabled:
                 try:
-                    await self.disable_plugin(pi)
+                    await self.disable_plugin(pi, ignore_depends=ignore_depends)
                 except (Exception,):
                     log.exception(f"Exception in disable {pi.name} plugin", exc_info=True)
 
     # enable/disable
 
-    async def enable_plugin(self, plugin: PluginInfo | Plugin):
+    async def enable_plugin(self, plugin: PluginInfo | Plugin, *, ignore_depends=False):
         info = plugin if isinstance(plugin, PluginInfo) else plugin.info
 
         if info not in self.plugins.values():
@@ -796,6 +845,10 @@ class PluginManager(object):
             raise PluginOperationError("Not initialized")
         if info.enabled:
             raise PluginOperationError("Already enabled")
+        if not ignore_depends:
+            _, __, no_deps = self.get_depends(info, require_enabled=True)
+            if no_deps:
+                raise PluginDependencyError("Plugin required: " + ", ".join(no_deps))
 
         try:
             # noinspection PyProtectedMember
@@ -824,13 +877,16 @@ class PluginManager(object):
         return True
 
     # noinspection PyMethodMayBeStatic
-    async def disable_plugin(self, plugin: PluginInfo | Plugin):
+    async def disable_plugin(self, plugin: PluginInfo | Plugin, *, ignore_depends=False):
         info = plugin if isinstance(plugin, PluginInfo) else plugin.info
 
         if info.enabled:
-            depends = [pi.name for pi in self.plugins.values() if info.name in pi.depends and pi.enabled]
-            if depends:
-                raise PluginOperationError("depends: " + ", ".join(depends))
+            if not ignore_depends:
+                def _check_dep(pi: PluginInfo):
+                    return pi.enabled and any(1 for dep in {*pi.depends, *pi.softdepends} if info.name.lower() == dep)
+
+                if depends := [pi.name for pi in self.plugins.values() if _check_dep(pi)]:
+                    raise PluginDependencyError("depends on: " + ", ".join(depends))
 
             log.debug(f"Disabling {info.name} v{info.version}")
 
@@ -853,26 +909,26 @@ class PluginManager(object):
 
         return True
 
-    async def reload_plugin(self, plugin: PluginInfo | Plugin):
+    async def reload_plugin(self, plugin: PluginInfo | Plugin, *, ignore_depends=False):
         info = plugin if isinstance(plugin, PluginInfo) else plugin.info
 
         if not info.is_reloadable():
             raise PluginOperationError("Not reloadable plugin")
 
         if info.enabled:
-            await self.disable_plugin(info)
+            await self.disable_plugin(info, ignore_depends=ignore_depends)
 
-        await self.unload_plugin(info)
+        await self.unload_plugin(info, ignore_depends=ignore_depends)
         new_info = await self.load_plugin(info.loader, None)
 
         if new_info:
-            await self.enable_plugin(new_info)
+            await self.enable_plugin(new_info, ignore_depends=ignore_depends)
 
         return new_info
 
     # load/unload
 
-    async def load_plugin(self, loader: PluginLoader, info: PluginInfo | None):
+    async def load_plugin(self, loader: PluginLoader, info: PluginInfo | None, *, ignore_depends=False):
         if info is None:
             info = loader.create_info()
 
@@ -880,9 +936,14 @@ class PluginManager(object):
             raise PluginOperationError(f"Already exists plugin name: {info.name}")
 
         try:
+            if not ignore_depends:
+                _, __, no_deps = self.get_depends(info)
+                if no_deps:
+                    raise PluginDependencyError(", ".join(no_deps), depends=list(no_deps))
             info.load()
+
         except PluginException as e:
-            log.error(f"プラグイン {info.name} を初期化できません: {e}")
+            log.error(f"プラグイン {info.name} を初期化できません: {type(e).__name__}: {e}")
             info.load_exception = e
             return
 
@@ -894,9 +955,16 @@ class PluginManager(object):
         self.plugins[info.name.lower()] = info
         return info
 
-    async def unload_plugin(self, info: PluginInfo):
+    async def unload_plugin(self, info: PluginInfo, *, ignore_depends=False):
         if info.enabled:
             raise PluginOperationError("Enabled Plugin")
+
+        if not ignore_depends:
+            def _check_dep(pi: PluginInfo):
+                return pi.enabled and any(1 for dep in {*pi.depends, *pi.softdepends} if info.name.lower() == dep)
+
+            if depends := [pi.name for pi in self.plugins.values() if _check_dep(pi)]:
+                raise PluginDependencyError("depends on: " + ", ".join(depends))
 
         if info.instance:
             try:
