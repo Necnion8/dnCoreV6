@@ -359,11 +359,17 @@ class PluginModuleLoader(PluginLoader):
     def get_import_name(self):
         return self._import_module_name
 
-    async def pack_to_plugin_file(self, plugins_dir: Path, *, info: PluginInfo = None, extra_name: str = None):
+    async def pack_to_plugin_file(
+        self, plugins_dir: Path, *, info: PluginInfo = None, extra_name: str = None, force_override=False,
+    ):
         return await asyncio.get_running_loop().run_in_executor(
-            None, lambda: self.pack_to_plugin_file_(plugins_dir, info=info, extra_name=extra_name))
+            None, lambda: self.pack_to_plugin_file_(
+                plugins_dir, info=info, extra_name=extra_name, force_override=force_override,
+            ))
 
-    def pack_to_plugin_file_(self, plugins_dir: Path, *, info: PluginInfo = None, extra_name: str = None):
+    def pack_to_plugin_file_(
+        self, plugins_dir: Path, *, info: PluginInfo = None, extra_name: str = None, force_override=False,
+    ):
         if info is None:
             info = self.create_info()
 
@@ -372,7 +378,7 @@ class PluginModuleLoader(PluginLoader):
         _extra = f"_{extra_name}" if extra_name else ""
         out_name = f"{_name}-{_ver}{_extra}.dcp"
 
-        if (plugins_dir / out_name).is_file():
+        if (plugins_dir / out_name).is_file() and not force_override:
             raise FileExistsError(f"already exists: {plugins_dir / out_name}")
 
         log.info("Plugin Packing: %s", self.module_directory)
@@ -982,9 +988,11 @@ class PluginManager(object):
 
     # packages
 
-    async def pack_to_plugin_file(self, mod_dir: Path, extra_name: str = None):
+    async def pack_to_plugin_file(self, mod_dir: Path, extra_name: str = None, force_override=False):
         loader = PluginModuleLoader(module_directory=mod_dir, data_dir=self.plugin_data_dir)
-        return await loader.pack_to_plugin_file(self.plugins_directory, extra_name=extra_name)
+        return await loader.pack_to_plugin_file(
+            self.plugins_directory, extra_name=extra_name, force_override=force_override,
+        )
 
     async def unpack_to_extension_module(self, dcp_file: Path, extract_resources=False):
         loader = PluginZipFileLoader(plugin_file=dcp_file, data_dir=self.plugin_data_dir)

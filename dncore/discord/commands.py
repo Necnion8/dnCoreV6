@@ -343,11 +343,11 @@ class DNCoreCommands(EventListener):
         {prefix}{name} pmr (plugin) [-f]
 
         # Plugin To File: toPlugin, toExtension
-        {prefix}{name} pm2p (plugin) [fileExtraName]
+        {prefix}{name} pm2p (plugin) [fileExtraName] [-f]
         {prefix}{name} pm2e (plugin)
 
         # Plugin File To File: ExtToPlugin, PluginToExt
-        {prefix}{name} pf2p (extModName) [fileExtraName]
+        {prefix}{name} pf2p (extModName) [fileExtraName] [-f]
         {prefix}{name} pf2e (plFileName)```
         """
         mode = ctx.arguments.get(0, "info").lower()
@@ -659,11 +659,13 @@ class DNCoreCommands(EventListener):
             return Embed.info(f":jigsaw: {plugin.name} v{plugin.version} をアンロードしました。")
 
         elif mode == "pm2p":
+            args = ctx.arguments
             try:
-                plugin = plmgr.get_plugin_info(ctx.arguments[1])
+                plugin = plmgr.get_plugin_info(args[1])
             except IndexError:
                 return Embed.warn(":grey_exclamation: プラグインを指定してください。")
-            extra_name = " ".join(ctx.arguments[2:]) or None
+            force = bool(args and args[-1] == "-f" and args.pop(-1))
+            extra_name = " ".join(args[2:]) or None
 
             if not plugin:
                 return Embed.error(":grey_exclamation: プラグインが見つかりません。")
@@ -674,7 +676,9 @@ class DNCoreCommands(EventListener):
 
             try:
                 async with ctx.typing():
-                    packed_path = await loader.pack_to_plugin_file(plmgr.plugins_directory, info=plugin, extra_name=extra_name)
+                    packed_path = await loader.pack_to_plugin_file(
+                        plmgr.plugins_directory, info=plugin, extra_name=extra_name, force_override=force,
+                    )
 
             except FileExistsError:
                 return Embed.error(f":grey_exclamation: 同じ名前のファイルが存在します。")
@@ -704,18 +708,20 @@ class DNCoreCommands(EventListener):
             return Embed.info(f":ok_hand: {unpacked_path.name} モジュールとして書き出しました。")
 
         elif mode == "pf2p":
+            args = ctx.arguments
             try:
-                mod_dir = plmgr.extensions_directory / ctx.arguments[1]
+                mod_dir = plmgr.extensions_directory / args[1]
             except IndexError:
                 return Embed.warn(":grey_exclamation: モジュール名を指定してください。")
-            extra_name = " ".join(ctx.arguments[2:]) or None
+            force = bool(args and args[-1] == "-f" and args.pop(-1))
+            extra_name = " ".join(args[2:]) or None
 
             if not mod_dir.is_dir():
                 return Embed.error(":grey_exclamation: 見つかりません")
 
             try:
                 async with ctx.typing():
-                    packed_path = await plmgr.pack_to_plugin_file(mod_dir, extra_name=extra_name)
+                    packed_path = await plmgr.pack_to_plugin_file(mod_dir, extra_name=extra_name, force_override=force)
 
             except FileExistsError:
                 return Embed.error(f":grey_exclamation: 同じ名前のファイルが存在します。")
