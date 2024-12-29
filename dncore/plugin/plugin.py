@@ -23,7 +23,11 @@ from .events import *
 
 log = logging.getLogger(__name__)
 yaml = ruamel.yaml.YAML()
-__all__ = ["PluginInfo", "Plugin",
+
+PLUGIN_FILE_EXTENSION = ".dcp"
+EXTENSIONS_DIRECTORY = "dncore/extensions"
+
+__all__ = ["PluginInfo", "Plugin", "PLUGIN_FILE_EXTENSION", "EXTENSIONS_DIRECTORY",
            "PluginLoader", "PluginModuleLoader", "PluginZipFileLoader",
            "PluginContainer", "PluginManager", "sorted_plugins", "all_iter"]
 
@@ -367,14 +371,17 @@ class PluginModuleLoader(PluginLoader):
 
     async def pack_to_plugin_file(
         self, plugins_dir: Path, *, info: PluginInfo = None, extra_name: str = None, force_override=False,
+        file_extension: str = PLUGIN_FILE_EXTENSION,
     ):
         return await asyncio.get_running_loop().run_in_executor(
             None, lambda: self.pack_to_plugin_file_(
                 plugins_dir, info=info, extra_name=extra_name, force_override=force_override,
+                file_extension=file_extension,
             ))
 
     def pack_to_plugin_file_(
         self, plugins_dir: Path, *, info: PluginInfo = None, extra_name: str = None, force_override=False,
+        file_extension: str = PLUGIN_FILE_EXTENSION,
     ):
         if info is None:
             info = self.create_info()
@@ -382,7 +389,7 @@ class PluginModuleLoader(PluginLoader):
         _name = info.name
         _ver = str(info.version).replace("/", "-")
         _extra = f"_{extra_name}" if extra_name else ""
-        out_name = f"{_name}-{_ver}{_extra}.dcp"
+        out_name = f"{_name}-{_ver}{_extra}{file_extension}"
 
         if (plugins_dir / out_name).is_file() and not force_override:
             raise FileExistsError(f"already exists: {plugins_dir / out_name}")
@@ -655,13 +662,16 @@ class PluginContainer(dict[str, PluginInfo]):
 
 
 class PluginManager(object):
-    def __init__(self, loop: asyncio.AbstractEventLoop, plugins_directory: Path, *, data_dir: Path = None):
+    def __init__(self, loop: asyncio.AbstractEventLoop, plugins_directory: Path,
+                 *, data_dir: Path = None, extensions_directory: str = EXTENSIONS_DIRECTORY,
+                 plugin_file_extension: str = PLUGIN_FILE_EXTENSION):
         self.loop = loop
-        self.extensions_directory = Path("dncore/extensions")
+        self.extensions_directory = Path(extensions_directory)
         self.plugins_directory = plugins_directory
         self.plugins = PluginContainer()
 
         self.plugin_data_dir = plugins_directory if data_dir is None else data_dir
+        self.plugin_file_extension = plugin_file_extension
 
     def get_plugin(self, name: str):
         info = self.plugins.get(name.lower())
@@ -709,7 +719,7 @@ class PluginManager(object):
         plugins_path = self.plugins_directory
         plugins_path.mkdir(parents=True, exist_ok=True)
         plugin_files = [child for child in sorted(plugins_path.iterdir())
-                        if child.is_file() and child.name.endswith(".dcp")]
+                        if child.is_file() and child.name.endswith(self.plugin_file_extension)]
 
         # load plugin info
         _plugins = []
@@ -992,10 +1002,15 @@ class PluginManager(object):
 
     # packages
 
-    async def pack_to_plugin_file(self, mod_dir: Path, extra_name: str = None, force_override=False):
+    async def pack_to_plugin_file(
+        self, mod_dir: Path, extra_name: str = None, force_override=False, file_extension: str = None,
+    ):
         loader = PluginModuleLoader(module_directory=mod_dir, data_dir=self.plugin_data_dir)
         return await loader.pack_to_plugin_file(
-            self.plugins_directory, extra_name=extra_name, force_override=force_override,
+            self.plugins_directory,
+            extra_name=extra_name,
+            force_override=force_override,
+            file_extension=file_extension or self.plugin_file_extension,
         )
 
     async def unpack_to_extension_module(self, dcp_file: Path, extract_resources=False):

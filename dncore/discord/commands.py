@@ -595,7 +595,7 @@ class DNCoreCommands(EventListener):
                     log.warning("Failed to load extension info", exc_info=e)
                     return Embed.error(":grey_exclamation: プラグイン情報をロードできませんでした。")
 
-            elif _filename.endswith(".dcp"):  # plugin path
+            elif _filename.endswith(plmgr.plugin_file_extension):  # plugin path
                 pl_file = plmgr.plugins_directory / filename
                 if not pl_file.is_file():
                     return Embed.error(":grey_exclamation: 指定されたプラグインファイルが見つかりません。")
@@ -604,13 +604,13 @@ class DNCoreCommands(EventListener):
                 try:
                     info = loader.create_info()
                 except Exception as e:
-                    log.warning("Failed to load dcp info", exc_info=e)
+                    log.warning("Failed to load %s info", plmgr.plugin_file_extension, exc_info=e)
                     return Embed.error(":grey_exclamation: プラグイン情報をロードできませんでした。")
 
             else:  # name search
                 _search_info = []  # type: list[PluginInfo]
                 for child in plmgr.plugins_directory.iterdir():
-                    if not child.is_file() or not child.name.endswith(".dcp"):
+                    if not child.is_file() or not child.name.endswith(plmgr.plugin_file_extension):
                         continue
                     try:
                         loader = PluginZipFileLoader(child, plmgr.plugin_data_dir)
@@ -687,7 +687,11 @@ class DNCoreCommands(EventListener):
             try:
                 async with ctx.typing():
                     packed_path = await loader.pack_to_plugin_file(
-                        plmgr.plugins_directory, info=plugin, extra_name=extra_name, force_override=force,
+                        plmgr.plugins_directory,
+                        info=plugin,
+                        extra_name=extra_name,
+                        force_override=force,
+                        file_extension=plmgr.plugin_file_extension,
                     )
 
             except FileExistsError:

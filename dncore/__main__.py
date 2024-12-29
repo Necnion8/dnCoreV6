@@ -26,7 +26,7 @@ def main():
 
         from pathlib import Path
         import logging
-        from dncore.plugin import PluginModuleLoader
+        from dncore.plugin import PluginModuleLoader, PLUGIN_FILE_EXTENSION
 
         mod_dir = Path("dncore/extensions/") / mod_name
         plugins_dir = Path("plugins")
@@ -37,7 +37,12 @@ def main():
         logging.basicConfig(format="{message}", style="{", level=logging.DEBUG)
         loader = PluginModuleLoader(module_directory=mod_dir, data_dir=plugins_dir)
         try:
-            packed = loader.pack_to_plugin_file_(plugins_dir, extra_name=extra_name, force_override=file_override)
+            packed = loader.pack_to_plugin_file_(
+                plugins_dir,
+                extra_name=extra_name,
+                force_override=file_override,
+                file_extension=PLUGIN_FILE_EXTENSION,
+            )
 
         except FileExistsError as e:
             print(e, file=sys.stderr)
