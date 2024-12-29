@@ -17,7 +17,7 @@ from dncore.discord.status import Activity
 from dncore.event import EventListener
 from dncore.util.discord import get_intent_names
 from dncore.util.instance import get_core, call_event
-from dncore.util.module import import_module_from_file_location
+from dncore.util.module import *
 from .errors import *
 from .events import *
 
@@ -476,13 +476,12 @@ class PluginZipFileLoader(PluginLoader):
         clazz = main[main.rindex(".")+1:]  # TestPlugin
         modules_root = ".".join(modules_root_path.parts)  # dncore.extensions
 
-        self._importer = zipimport.zipimporter(self.plugin_file)
+        self._importer = zipimport.zipimporter(str(self.plugin_file))
 
         _sp = package.count(".")
         for i in range(_sp + 1):
             module = ".".join(package.split(".")[: i or None])
-            mod_spec = self._importer.find_spec(module)
-            if mod_spec:
+            if mod_spec := self._importer.find_spec(module):
                 break
         else:
             raise Exception(f"Cannot find module: {package}")
@@ -496,9 +495,8 @@ class PluginZipFileLoader(PluginLoader):
         log.debug("Loading %s v%s by %s (module: %s)", info.name, info.version, author, self._module_name)
 
         # load module (or package)
-        mod = self._importer.load_module(_import_module)  # import testplugin
-        if _import_module != _import_package:
-            mod = importlib.import_module(_import_package)  # import testplugin.main
+        import_module_from_spec(_import_package, mod_spec)
+        mod = importlib.import_module(_import_package)
         return getattr(mod, clazz)
 
     def get_module_name(self):
