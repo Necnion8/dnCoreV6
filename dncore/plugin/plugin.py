@@ -59,7 +59,7 @@ class PluginInfo:
                  main: str, version: Version, loader: "PluginLoader", plugin_data_dir: Path,
                  authors: list[str] = None, depends: list[str] = None, softdepends: list[str] = None,
                  libraries: list[str] = None, target_dncore: Version = None, resource_files: list[str] = None,
-                 description: str = None, changelog: dict[str, str] = None,
+                 description: str = None, changelog: dict[str, str] = None, website: str = None,
                  ):
         if PluginInfo.ALLOW_NAME.fullmatch(name) is None:
             raise ValueError(f"Invalid plugin name: {name}")
@@ -75,6 +75,7 @@ class PluginInfo:
         self.resource_files = [] if resource_files is None else resource_files  # type: list[str]
         self.description = description
         self.changelog = changelog
+        self.website = website
 
         self.instance: Optional[Plugin] = None
         self.enabled = False
@@ -143,6 +144,9 @@ class PluginInfo:
         if self.changelog:
             serialized["changelog"] = self.changelog
 
+        if self.website:
+            serialized["website"] = self.website
+
         return serialized
 
     @classmethod
@@ -163,6 +167,8 @@ class PluginInfo:
                 info.libraries = data["libraries"]
             if "dncore" in data:
                 info.target_dncore = Version.parse(data["dncore"])
+            if "website" in data:
+                info.website = str(data["website"])
 
             info.resource_files = [e for e in data.get("resource_files", []) if isinstance(e, str)]
 

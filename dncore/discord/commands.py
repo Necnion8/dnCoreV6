@@ -21,7 +21,8 @@ log = getLogger(__name__)
 
 
 class SettingCommand(object):
-    def __init__(self, owner: Any, name: str, usage: str, function: Callable[[CommandContext], Awaitable[None | Embed]]):
+    def __init__(self, owner: Any, name: str, usage: str,
+                 function: Callable[[CommandContext], Awaitable[None | Embed]]):
         self.owner = owner
         self.name = name.lower()
         self.usage = usage
@@ -252,7 +253,7 @@ class DNCoreCommands(EventListener):
                     continue
 
                 if line and not line.startswith(("return", "  ")):
-                    lines[-idx-1] = f"r = {line}"
+                    lines[-idx - 1] = f"r = {line}"
                     lines.append("return r")
                 break
 
@@ -364,7 +365,7 @@ class DNCoreCommands(EventListener):
             running = [c for cc in cmdmgr.running_commands.values() for c in cc]
             aliases = list(cmdmgr.aliases)
             registered = sum([bool(hid in commands.values() and handler) for hid, handler in handlers.items()])
-            disabled_text = f" ({len(commands)-registered} disabled)" if len(commands) - registered else ""
+            disabled_text = f" ({len(commands) - registered} disabled)" if len(commands) - registered else ""
             client = get_core().client
             owner_text = f"**{client.owner}**" if client.owner else "*unknown*"
             version = get_core().version
@@ -470,16 +471,25 @@ class DNCoreCommands(EventListener):
                     source_file = source_file.name if source_file else None
             source = f" ({source_file})" if source_file else ""
 
-            _depends_lines = []
+            _extra_info = []
+            if plugin.website:
+                website_value = None
+                if re.search(r"^https?://github\.com/.+/.+", plugin.website):
+                    try:
+                        sp = plugin.website.split("/")
+                        website_value = f"[{sp[3]}/{sp[4]}]({plugin.website})"
+                    except (Exception,):
+                        pass
+                _extra_info.append(":white_small_square: Website: " + (website_value or plugin.website))
             if plugin.depends:
-                _depends_lines.append(":white_small_square: Depends: " + ", ".join(plugin.depends))
+                _extra_info.append(":white_small_square: Depends: " + ", ".join(plugin.depends))
             if plugin.softdepends:
-                _depends_lines.append(":white_small_square: SoftDepends: " + ", ".join(plugin.softdepends))
+                _extra_info.append(":white_small_square: SoftDepends: " + ", ".join(plugin.softdepends))
             description_lines = [
                 f":white_small_square: Version: **{plugin.version}**",
                 f":white_small_square: Status: **{state}**",
                 f":white_small_square: Loader: {type(plugin.loader).__name__}{source}",
-                *_depends_lines,
+                *_extra_info,
                 f":white_small_square: Commands: {', '.join(commands)}",
             ]
 
