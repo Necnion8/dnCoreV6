@@ -268,6 +268,8 @@ class DNCore(object):
 
         signal.signal(signal.SIGINT, on_signal)
         signal.signal(signal.SIGTERM, on_signal)
+        if hasattr(signal, "SIGBREAK"):  # Windows
+            signal.signal(signal.SIGBREAK, on_signal)
 
     def _loggers(self):
         root = logging.getLogger("dncore")
