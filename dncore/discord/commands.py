@@ -215,6 +215,14 @@ class DNCoreCommands(EventListener):
             content = "\n".join(content.rstrip("`\n").split("\n")[1:])
         content = content.strip("` \n")
 
+        message_reference = None
+        if (_reference := ctx.message.reference) is not None:
+            if (message_reference := _reference.resolved) is None:
+                try:
+                    message_reference = await ctx.channel.fetch_message(_reference.message_id)
+                except discord.HTTPException as e:
+                    log.warning("Unable to fetch referenced message: %s", e)
+
         from dncore.dncore import DNCoreAPI
 
         __globals = dict(
@@ -223,13 +231,15 @@ class DNCoreCommands(EventListener):
             core=get_core(),
             loop=get_core().loop,
             client=get_core().client,
-            me=get_core().client.user,
+            me=ctx.guild.me if ctx.guild else get_core().client.user,
             ctx=ctx,
+            message_reference=message_reference,
             message=ctx.message,
             channel=ctx.channel,
             author=ctx.author,
             guild=ctx.guild,
             api=DNCoreAPI,
+            ref=message_reference,
             m=ctx.message,
             ch=ctx.channel,
             g=ctx.guild,
