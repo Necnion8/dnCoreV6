@@ -136,7 +136,8 @@ class CommandContext(MessageSender):
         self.execute_name = execute_name
         self.orig_args = args
         self.client = client
-        self.me = client.user  # type: discord.abc.ClientUser
+        self.me = message.guild.me if message.guild else client.user  # type: discord.abc.ClientUser | discord.Member
+        """Changed in v6.1.2~ コマンドの発生元がギルドであれば自身の discord.Member を返します"""
         self.content = message.content  # type: str
         self.args_content = self.content[len(self.prefix + self.execute_name) + 1:]
         self.command = command  # type: CommandHandler
