@@ -24,7 +24,7 @@ class DatetimeSerializer(ObjectSerializer):
     @classmethod
     def deserialize(cls, value):
         if isinstance(value, float):
-            return datetime.datetime.utcfromtimestamp(value)  # bug fix
+            datetime.datetime.fromtimestamp(value, datetime.timezone.utc)  # bug fix
 
         return datetime.datetime.fromisoformat(value)
 
@@ -84,6 +84,10 @@ class GuildId(ObjectSerializable, Cloneable):
         except discord.HTTPException:
             pass
 
+    def __eq__(self, other):
+        """Added in v6.1.2~"""
+        return isinstance(other, GuildId) and other.id == self.id
+
 
 class ChannelId(ObjectSerializable, Cloneable):
     def __init__(self, channel_id: int = None):
@@ -115,6 +119,10 @@ class ChannelId(ObjectSerializable, Cloneable):
             return await self.fetch()
         except discord.HTTPException:
             pass
+
+    def __eq__(self, other):
+        """Added in v6.1.2~"""
+        return isinstance(other, ChannelId) and other.id == self.id
 
 
 class MessageId(ObjectSerializable, Cloneable):
@@ -148,6 +156,10 @@ class MessageId(ObjectSerializable, Cloneable):
             return await self.fetch()
         except discord.HTTPException:
             pass
+
+    def __eq__(self, other):
+        """Added in v6.1.2~"""
+        return isinstance(other, MessageId) and other.id == self.id and other.channel_id == self.channel_id
 
 
 class RoleId(ObjectSerializable, Cloneable):
@@ -187,6 +199,10 @@ class RoleId(ObjectSerializable, Cloneable):
         except discord.HTTPException:
             pass
 
+    def __eq__(self, other):
+        """Added in v6.1.2~"""
+        return isinstance(other, RoleId) and other.id == self.id and other.guild_id == self.guild_id
+
 
 class Color(ObjectSerializable, Cloneable):
     def __init__(self, value: int = None, nullable=False):
@@ -214,6 +230,10 @@ class Color(ObjectSerializable, Cloneable):
         value = self.default if self.value is None else self.value
         if value is not None:
             return discord.Colour(value)
+
+    def __eq__(self, other):
+        """Added in v6.1.2~"""
+        return isinstance(other, Color) and other.value == self.value
 
 
 class Embed(ObjectSerializable, Cloneable, discord.Embed):
@@ -422,6 +442,10 @@ class Reaction(ObjectSerializable, Cloneable):
     def clone(self):
         return type(self)(reaction=self.reaction.clone() if self.reaction else None)
 
+    def __eq__(self, other):
+        """Added in v6.1.2~"""
+        return isinstance(other, Reaction) and other.reaction == self.reaction
+
 
 class ActivitySetting(ObjectSerializable, Cloneable):
     def __init__(self, status: str | discord.Status = "online", activity: str = None):
@@ -457,6 +481,10 @@ class ActivitySetting(ObjectSerializable, Cloneable):
     def create(self, priority: int):
         from dncore.discord.status import Activity
         return Activity(discord.Game(name=self.activity) if self.activity else None, priority, status=self.status)
+
+    def __eq__(self, other):
+        """Added in v6.1.2~"""
+        return isinstance(other, ActivitySetting) and other._status == self._status and other.activity == self.activity
 
 
 def serializers():
