@@ -59,12 +59,24 @@ class PluginInfo:
     # PACKAGES = {}
     ALLOW_NAME = re.compile(r"^[a-zA-Z0-9_]+$")
 
-    def __init__(self, name: str, *,
-                 main: str, version: Version, loader: "PluginLoader", plugin_data_dir: Path,
-                 authors: list[str] = None, depends: list[str] = None, softdepends: list[str] = None,
-                 libraries: list[str] = None, target_dncore: Version = None, resource_files: list[str] = None,
-                 description: str = None, changelog: dict[str, str] = None, website: str = None,
-                 ):
+    def __init__(
+        self,
+        name: str,
+        *,
+        main: str,
+        version: Version,
+        loader: "PluginLoader",
+        plugin_data_dir: Path,
+        authors: list[str] | None = None,
+        depends: list[str] | None = None,
+        softdepends: list[str] | None = None,
+        libraries: list[str] | None = None,
+        target_dncore: Version | None = None,
+        resource_files: list[str] | None = None,
+        description: str | None = None,
+        changelog: dict[str, str] | None = None,
+        website: str | None = None,
+    ):
         if PluginInfo.ALLOW_NAME.fullmatch(name) is None:
             raise ValueError(f"Invalid plugin name: {name}")
 
@@ -94,7 +106,7 @@ class PluginInfo:
 
     def load(self):
         if self.instance:
-            return
+            return self.instance
         # self.get_logger().addFilter(PluginInfo.PluginNameFilter(self.name))
 
         try:
@@ -223,15 +235,15 @@ class Plugin(EventListener):
     def register_activity(self, activity: Activity):
         return get_core().activity_manager.register_activity(self, activity)
 
-    def unregister_activity(self, activity: Activity = None):
+    def unregister_activity(self, activity: Activity | None = None):
         return get_core().activity_manager.unregister_activity(owner=self, activity=activity)
 
     def register_listener(self, listener: EventListener):
         return get_core().events.register_listener(self, listener)
 
-    def unregister_listener(self, listener: EventListener = None):
+    def unregister_listener(self, listener: EventListener | None = None):
         if listener is None:
-            return get_core().events.unregister_listeners(self)
+            get_core().events.unregister_listeners(self)
         else:
             get_core().events.unregister_listener(listener)
 
@@ -250,7 +262,7 @@ class Plugin(EventListener):
     async def extract_resources(self):
         if isinstance(self.info.loader, PluginZipFileLoader):
             loader = self.info.loader
-            return await get_core().loop.run_in_executor(
+            await get_core().loop.run_in_executor(
                 None, lambda: loader.extract_resource_files(self.info))
 
     async def _enable(self):
@@ -370,7 +382,7 @@ class PluginModuleLoader(PluginLoader):
         return self._import_module_name
 
     async def pack_to_plugin_file(
-        self, plugins_dir: Path, *, info: PluginInfo = None, extra_name: str = None, force_override=False,
+        self, plugins_dir: Path, *, info: PluginInfo | None = None, extra_name: str | None = None, force_override=False,
         file_extension: str = PLUGIN_FILE_EXTENSION,
     ):
         return await asyncio.get_running_loop().run_in_executor(
@@ -380,7 +392,7 @@ class PluginModuleLoader(PluginLoader):
             ))
 
     def pack_to_plugin_file_(
-        self, plugins_dir: Path, *, info: PluginInfo = None, extra_name: str = None, force_override=False,
+        self, plugins_dir: Path, *, info: PluginInfo | None = None, extra_name: str | None = None, force_override=False,
         file_extension: str = PLUGIN_FILE_EXTENSION,
     ):
         if info is None:
@@ -521,11 +533,19 @@ class PluginZipFileLoader(PluginLoader):
     def get_import_name(self):
         return self._import_module_name
 
-    async def unpack_to_extension_module(self, extensions_dir: Path, *, info: PluginInfo = None, extract_resources=False):
+    async def unpack_to_extension_module(
+        self, extensions_dir: Path, *, info: PluginInfo | None = None, extract_resources=False,
+    ):
         return await asyncio.get_running_loop().run_in_executor(
-            None, lambda: self.unpack_to_extension_module_(extensions_dir, info=info, extract_resources=extract_resources))
+            None,
+            lambda: self.unpack_to_extension_module_(
+                extensions_dir, info=info, extract_resources=extract_resources,
+            )
+        )
 
-    def unpack_to_extension_module_(self, extensions_dir: Path, *, info: PluginInfo = None, extract_resources=False):
+    def unpack_to_extension_module_(
+        self, extensions_dir: Path, *, info: PluginInfo | None = None, extract_resources=False,
+    ):
         if info is None:
             info = self.create_info()
 
@@ -656,6 +676,8 @@ class PluginContainer(dict[str, PluginInfo]):
             if info is pi:
                 return self.pop(name)
 
+        return None
+
     @property
     def instances(self):
         return [p.instance for p in self.values() if p.enabled and p.instance]
@@ -663,7 +685,7 @@ class PluginContainer(dict[str, PluginInfo]):
 
 class PluginManager(object):
     def __init__(self, loop: asyncio.AbstractEventLoop, plugins_directory: Path,
-                 *, data_dir: Path = None, extensions_directory: str = EXTENSIONS_DIRECTORY,
+                 *, data_dir: Path | None = None, extensions_directory: str = EXTENSIONS_DIRECTORY,
                  plugin_file_extension: str = PLUGIN_FILE_EXTENSION):
         self.loop = loop
         self.extensions_directory = Path(extensions_directory)
@@ -675,8 +697,7 @@ class PluginManager(object):
 
     def get_plugin(self, name: str):
         info = self.plugins.get(name.lower())
-        if info:
-            return info.instance
+        return info.instance if info else None
 
     def get_plugin_info(self, name: str):
         return self.plugins.get(name.lower())
@@ -799,7 +820,7 @@ class PluginManager(object):
 
         return depends, unknown_softdepends, unknown_depends
 
-    def load_plugins(self, *, ignore_names: list[str] = None):
+    def load_plugins(self, *, ignore_names: list[str] | None = None):
         self.plugins.clear()
         _ignore_names = [n.lower() for n in ignore_names] if ignore_names else []
         ignored = []  # type: list[PluginInfo]
@@ -841,7 +862,10 @@ class PluginManager(object):
                     r = False
             results[not r].append(pi)
 
-        log.info("プラグイン %s個を有効化しました。%s", len(results[0]), f" (エラー: {len(results[1])})" if results[1] else "")
+        log.info(
+            "プラグイン %s個を有効化しました。%s",
+            len(results[0]), f" (エラー: {len(results[1])})" if results[1] else "",
+        )
         return results
 
     async def disable_plugins(self, *, ignore_depends=True):
@@ -966,12 +990,12 @@ class PluginManager(object):
         except PluginException as e:
             log.error(f"プラグイン {info.name} を初期化できません: {type(e).__name__}: {e}")
             info.load_exception = e
-            return
+            return None
 
         except Exception as e:
             log.exception(f"プラグイン {info.name} を初期化できません。")
             info.load_exception = e
-            return
+            return None
 
         self.plugins[info.name.lower()] = info
         return info
@@ -1003,7 +1027,7 @@ class PluginManager(object):
     # packages
 
     async def pack_to_plugin_file(
-        self, mod_dir: Path, extra_name: str = None, force_override=False, file_extension: str = None,
+        self, mod_dir: Path, extra_name: str | None = None, force_override=False, file_extension: str | None = None,
     ):
         loader = PluginModuleLoader(module_directory=mod_dir, data_dir=self.plugin_data_dir)
         return await loader.pack_to_plugin_file(

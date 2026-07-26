@@ -21,8 +21,7 @@ class NameSpecFinder(MetaPathFinder):
             self.spec = lambda: spec
 
     def find_spec(self, fullname, *_):
-        if fullname == self.name:
-            return self.spec()
+        return self.spec() if fullname == self.name else None
 
 
 def import_module_from_file_location(name, location):

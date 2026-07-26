@@ -39,7 +39,8 @@ T = TypeVar("T")
 # noinspection PyMethodMayBeStatic
 class DNCore(object):
     def __init__(self, *, config_dir="config/", plugins_dir="plugins/"):
-        self.loop = None  # type: Optional[asyncio.AbstractEventLoop]
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
         _core(self)
 
         self._restart = False
@@ -50,8 +51,6 @@ class DNCore(object):
         self.plugins_dir = Path(plugins_dir)
         self.conn_act = None  # type: Optional[Activity]
 
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
         self.config = AppConfig(self.config_dir / "config.yml", errors=CnfErr.RAISE)
         self.data = DataFile(self.config_dir / "data.yml")
         self.events = EventManager(self.loop)
@@ -107,7 +106,7 @@ class DNCore(object):
             if error:
                 try:
                     self.loop.run_until_complete(self.shutdown())
-                except (Exception,) as ignored:
+                except (Exception, ):
                     pass
 
         self.loop.create_task(self._empty())
@@ -238,7 +237,7 @@ class DNCore(object):
                 log.error(f"Exception in close aiohttp client: {e}")
 
             try:
-                self.data.save(now=True)
+                self.data.save(force=True)
             except Exception as e:
                 log.exception(f"Exception in save data: {e}")
 
@@ -408,7 +407,7 @@ class DNCore(object):
                     await self.client.login(token=token)
 
                 except discord.DiscordServerError as e:
-                    reconnect_delay = reconnect_delay * 2
+                    reconnect_delay *= 2
                     if reconnect_delay > 900:
                         reconnect_delay = 900
 
@@ -537,7 +536,7 @@ class DNCoreAPI:
         return mgr.loop.create_task(mgr.call_event(event))
 
     @classmethod
-    def run_coroutine(cls, coro: T, ignores: Sequence[type[Exception]] = None) -> asyncio.Task[T]:
+    def run_coroutine(cls, coro: T, ignores: Sequence[type[Exception]] | None = None) -> asyncio.Task[T]:
         __ignore_frame = IGNORE_FRAME
         loop = get_core().loop
 
@@ -548,7 +547,7 @@ class DNCoreAPI:
             try:
                 return await coro
             except ignores:
-                return
+                return None
             except (Exception,):
                 get_caller_logger().exception(f"Exception in run_coroutine : {coro}")
 

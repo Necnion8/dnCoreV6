@@ -3,7 +3,8 @@ import sys
 
 def main():
     if len(sys.argv) <= 1:
-        return run_app()
+        run_app()
+        return
 
     action = sys.argv[1].lower()
 
@@ -94,13 +95,11 @@ def main():
         print("[All Plugin]")
         print(" " * 5 + "-" * 55)
         for p in plugins:
-            fp = loader = None
+            fp = None
             if isinstance(p.loader, PluginModuleLoader):
                 fp = p.loader.module_directory
-                loader = type(p.loader).__name__
             elif isinstance(p.loader, PluginZipFileLoader):
                 fp = p.loader.plugin_file
-                loader = type(p.loader).__name__
 
             print(f" {p.name:20} | {str(p.version):16} | {fp or ''}")
 

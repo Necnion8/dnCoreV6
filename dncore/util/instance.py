@@ -25,7 +25,7 @@ def call_event(event: T) -> Task[T]:
     return mgr.loop.create_task(mgr.call_event(event))
 
 
-def run_coroutine(coro: T, ignores: Sequence[type[Exception]] = None) -> Task[T]:
+def run_coroutine(coro: T, ignores: Sequence[type[Exception]] | None = None) -> Task[T]:
     # noinspection PyUnresolvedReferences,PyPep8Naming
     from dncore.abc import IGNORE_FRAME as __ignore_frame
 
@@ -39,7 +39,7 @@ def run_coroutine(coro: T, ignores: Sequence[type[Exception]] = None) -> Task[T]
         try:
             return await coro
         except ignores:
-            return
+            return None
         except (Exception,):
             get_caller_logger().exception(f"Exception in run_coroutine : {coro}")
 

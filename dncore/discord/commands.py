@@ -279,7 +279,7 @@ class DNCoreCommands(EventListener):
                 self.debug_last_messages.clear()
                 self.debug_last_messages.append(m)
                 self.debug_last_messages.append(ctx.message)
-                return
+                return None
 
         result = repr(result)
         log.info("Debug Result: %s", result)
@@ -294,6 +294,7 @@ class DNCoreCommands(EventListener):
         self.debug_last_messages.clear()
         self.debug_last_messages.append(m)
         self.debug_last_messages.append(ctx.message)
+        return None
 
     @oncommand(defaults=DEFAULT_OWNER_GROUP)
     async def cmd_shutdown(self, ctx: CommandContext):
@@ -403,8 +404,7 @@ class DNCoreCommands(EventListener):
 
         elif mode == "reconnect":
             if not get_core().config.discord.token:
-                await ctx.send_error(":warning: ボットトークンが設定されていません。")
-                return
+                return Embed.error(":warning: ボットトークンが設定されていません。")
 
             m = await ctx.send_warn(":recycle: Discordに再接続しています･･･")
             m_id = m.id
@@ -643,7 +643,7 @@ class DNCoreCommands(EventListener):
                 async with ctx.typing():
                     info = await plmgr.load_plugin(info.loader, info, ignore_depends=force)
                     if not info:
-                        raise PluginOperationError("Failed to load info")
+                        raise info.load_exception or PluginOperationError("Failed to load info")
                     res = await plmgr.enable_plugin(info, ignore_depends=force)
                     if res:
                         cmdmgr.remap()
@@ -772,6 +772,7 @@ class DNCoreCommands(EventListener):
 
         else:
             raise CommandUsageError
+        return None
 
     # events
 

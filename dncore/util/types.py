@@ -7,7 +7,10 @@ from typing import TypeVar, Any
 
 import unicodedata
 
-__all__ = ["typename", "traceback_simple_format", "SafeSet", "SafeList", "get_text_width", "strip_text_width", "safe_format", "Duration"]
+__all__ = [
+    "typename", "traceback_simple_format", "SafeSet", "SafeList",
+    "get_text_width", "strip_text_width", "safe_format", "Duration",
+]
 TRACEBACK_FILE_LINE = re.compile(r"^ {2}File \"(.+)\", line \d+, in .+$")
 T = TypeVar("T")
 

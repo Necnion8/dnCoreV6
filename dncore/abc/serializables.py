@@ -84,13 +84,13 @@ class GuildId(ObjectSerializable, Cloneable):
         except discord.HTTPException:
             pass
 
-    def __eq__(self, other):
+    def __eq__(self, other: object):
         """Added in v6.1.2~"""
         return isinstance(other, GuildId) and other.id == self.id
 
 
 class ChannelId(ObjectSerializable, Cloneable):
-    def __init__(self, channel_id: int = None):
+    def __init__(self, channel_id: int | None = None):
         self.id = channel_id
 
     def serialize(self):
@@ -120,13 +120,13 @@ class ChannelId(ObjectSerializable, Cloneable):
         except discord.HTTPException:
             pass
 
-    def __eq__(self, other):
+    def __eq__(self, other: object):
         """Added in v6.1.2~"""
         return isinstance(other, ChannelId) and other.id == self.id
 
 
 class MessageId(ObjectSerializable, Cloneable):
-    def __init__(self, message_id: int = None, channel_id: int = None):
+    def __init__(self, message_id: int | None = None, channel_id: int | None = None):
         self.id = message_id
         self.channel_id = channel_id
 
@@ -157,13 +157,13 @@ class MessageId(ObjectSerializable, Cloneable):
         except discord.HTTPException:
             pass
 
-    def __eq__(self, other):
+    def __eq__(self, other: object):
         """Added in v6.1.2~"""
         return isinstance(other, MessageId) and other.id == self.id and other.channel_id == self.channel_id
 
 
 class RoleId(ObjectSerializable, Cloneable):
-    def __init__(self, role_id: int = None, guild_id: int = None):
+    def __init__(self, role_id: int | None = None, guild_id: int | None = None):
         self.id = role_id
         self.guild_id = guild_id
 
@@ -199,21 +199,20 @@ class RoleId(ObjectSerializable, Cloneable):
         except discord.HTTPException:
             pass
 
-    def __eq__(self, other):
+    def __eq__(self, other: object):
         """Added in v6.1.2~"""
         return isinstance(other, RoleId) and other.id == self.id and other.guild_id == self.guild_id
 
 
 class Color(ObjectSerializable, Cloneable):
-    def __init__(self, value: int = None, nullable=False):
+    def __init__(self, value: int | None = None, nullable=False):
         self.nullable = nullable
         self.default = None if nullable else value
         self.value = value
 
     def serialize(self):
         value = self.default if self.value is None else self.value
-        if value is not None:
-            return hex(value)
+        return hex(value) if value is not None else None
 
     @classmethod
     def deserialize(cls, value):
@@ -221,6 +220,7 @@ class Color(ObjectSerializable, Cloneable):
             return cls(value)
         elif isinstance(value, str):
             return cls(int(value, 16))
+        return None
 
     def clone(self):
         return Color(self.value, nullable=self.nullable)
@@ -228,18 +228,17 @@ class Color(ObjectSerializable, Cloneable):
     @property
     def color(self):
         value = self.default if self.value is None else self.value
-        if value is not None:
-            return discord.Colour(value)
+        return discord.Colour(value) if value is not None else None
 
-    def __eq__(self, other):
+    def __eq__(self, other: object):
         """Added in v6.1.2~"""
         return isinstance(other, Color) and other.value == self.value
 
 
 class Embed(ObjectSerializable, Cloneable, discord.Embed):
-    def __init__(self, description: str = None, title: str = None, *,
-                 colour: int | discord.Colour = None, type: EmbedType = 'rich',
-                 url: Any = None, timestamp: datetime.datetime = None):
+    def __init__(self, description: str | None = None, title: str | None = None, *,
+                 colour: int | discord.Colour | None = None, type: EmbedType = 'rich',
+                 url: Any = None, timestamp: datetime.datetime | None = None):
 
         discord.Embed.__init__(self, colour=colour, title=title, type=type, url=url,
                                description=description, timestamp=timestamp)
@@ -267,7 +266,7 @@ class Embed(ObjectSerializable, Cloneable, discord.Embed):
         return self.copy()
 
     @classmethod
-    def info(cls, content: str | discord.Embed | None, title: str = None):
+    def info(cls, content: str | discord.Embed | None, title: str | None = None):
         if not isinstance(content, discord.Embed):
             embed = cls(description=content)
         else:
@@ -283,7 +282,7 @@ class Embed(ObjectSerializable, Cloneable, discord.Embed):
         return embed
 
     @classmethod
-    def warn(cls, content: str | discord.Embed | None, title: str = None):
+    def warn(cls, content: str | discord.Embed | None, title: str | None = None):
         if not isinstance(content, discord.Embed):
             embed = cls(description=content)
         else:
@@ -299,7 +298,7 @@ class Embed(ObjectSerializable, Cloneable, discord.Embed):
         return embed
 
     @classmethod
-    def error(cls, content: str | discord.Embed | None, title: str = None):
+    def error(cls, content: str | discord.Embed | None, title: str | None = None):
         if not isinstance(content, discord.Embed):
             embed = cls(description=content)
         else:
@@ -315,7 +314,7 @@ class Embed(ObjectSerializable, Cloneable, discord.Embed):
         return embed
 
     @staticmethod
-    def _format(m: str, values: dict[str, Any], log_name: str | None, *, is_url=False):
+    def _format(m: str | None, values: dict[str, Any], log_name: str | None, *, is_url=False):
         if not m:
             return m
 
@@ -406,7 +405,7 @@ class Emoji(ObjectSerializable, Cloneable, discord.PartialEmoji):
     @classmethod
     def deserialize(cls, value):
         if value is None:
-            return
+            return None
         if isinstance(value, str):
             return cls(name=value)
         return cls.from_dict(value)
@@ -426,6 +425,7 @@ class Reaction(ObjectSerializable, Cloneable):
         elif isinstance(self.reaction, Emoji):
             serialized = self.reaction.serialize(simple=False)
             return {"reaction": "emoji", **serialized}
+        return None
 
     @classmethod
     def deserialize(cls, value):
@@ -442,13 +442,13 @@ class Reaction(ObjectSerializable, Cloneable):
     def clone(self):
         return type(self)(reaction=self.reaction.clone() if self.reaction else None)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object):
         """Added in v6.1.2~"""
         return isinstance(other, Reaction) and other.reaction == self.reaction
 
 
 class ActivitySetting(ObjectSerializable, Cloneable):
-    def __init__(self, status: str | discord.Status = "online", activity: str = None):
+    def __init__(self, status: str | discord.Status = "online", activity: str | None = None):
         self._status = str(status)
         self.activity = activity
 
@@ -482,7 +482,7 @@ class ActivitySetting(ObjectSerializable, Cloneable):
         from dncore.discord.status import Activity
         return Activity(discord.Game(name=self.activity) if self.activity else None, priority, status=self.status)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object):
         """Added in v6.1.2~"""
         return isinstance(other, ActivitySetting) and other._status == self._status and other.activity == self.activity
 
