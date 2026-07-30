@@ -641,9 +641,13 @@ class DNCoreCommands(EventListener):
 
             try:
                 async with ctx.typing():
-                    info = await plmgr.load_plugin(info.loader, info, ignore_depends=force)
-                    if not info:
-                        raise info.load_exception or PluginOperationError("Failed to load info")
+                    if not (_info := await plmgr.load_plugin(info.loader, info, ignore_depends=force)):
+                        if isinstance(info.load_exception, PluginException):
+                            raise
+                        elif info.load_exception:
+                            raise PluginOperationError("プラグインの初期化に失敗しました")
+                        raise PluginOperationError("プラグインを読み込めませんでした")
+                    info = _info
                     res = await plmgr.enable_plugin(info, ignore_depends=force)
                     if res:
                         cmdmgr.remap()
