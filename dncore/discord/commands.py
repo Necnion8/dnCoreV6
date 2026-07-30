@@ -643,7 +643,7 @@ class DNCoreCommands(EventListener):
                 async with ctx.typing():
                     if not (_info := await plmgr.load_plugin(info.loader, info, ignore_depends=force)):
                         if isinstance(info.load_exception, PluginException):
-                            raise
+                            raise info.load_exception
                         elif info.load_exception:
                             raise PluginOperationError("プラグインの初期化に失敗しました")
                         raise PluginOperationError("プラグインを読み込めませんでした")
