@@ -5,10 +5,11 @@ from importlib.machinery import ModuleSpec
 from importlib.util import spec_from_file_location
 from inspect import isfunction
 from typing import Callable
+from zipimport import zipimporter
 
 __all__ = [
     "import_module_from_file_location",
-    "import_module_from_spec",
+    "VirtualZipImporter",
 ]
 
 
@@ -36,10 +37,23 @@ def import_module_from_file_location(name, location):
         sys.meta_path.remove(finder)
 
 
-def import_module_from_spec(name, spec: ModuleSpec):
-    finder = NameSpecFinder(name, spec)
-    sys.meta_path.insert(0, finder)
-    try:
-        return import_module(name)
-    finally:
-        sys.meta_path.remove(finder)
+class VirtualZipImporter(MetaPathFinder):
+    def __init__(self, zip_loader: zipimporter, mod_prefix: str):
+        self.zip_loader = zip_loader
+        self.mod_prefix = mod_prefix
+
+    def find_spec(self, fullname, path, target=None):
+        prefix_dot = self.mod_prefix + "."
+
+        if fullname == self.mod_prefix:
+            return ModuleSpec(fullname, None, is_package=True)
+
+        if fullname.startswith(prefix_dot):
+            real_mod_name = fullname[len(prefix_dot):]
+            spec = self.zip_loader.find_spec(real_mod_name, target)
+
+            if spec is not None:
+                spec.name = fullname
+                return spec
+
+        return None

@@ -55,7 +55,7 @@ def sorted_plugins(ls: list["PluginInfo"]):
 
 
 class PluginInfo:
-    EXTENSIONS_ROOT = Path("dncore/extensions")
+    EXTENSIONS_ROOT = Path(EXTENSIONS_DIRECTORY)
     # PACKAGES = {}
     ALLOW_NAME = re.compile(r"^[a-zA-Z0-9_]+$")
 
@@ -344,32 +344,29 @@ class PluginModuleLoader(PluginLoader):
         if info.target_dncore:
             core_ver = get_core().version
             if info.target_dncore > core_ver:
-                raise PluginRequirementsError(f"非対応バージョンです (v{info.target_dncore}] <= v{core_ver.numbers})")
+                raise PluginRequirementsError(f"非対応バージョンです (v{info.target_dncore} <= v{core_ver.numbers})")
 
-        # packageとmodule単語の使い方が逆。いつか直す
         main = info.main
-        package = main[:main.rindex(".")]
+        mod_path = main[:main.rindex(".")]
         clazz = main[main.rindex(".") + 1:]
-        modules_root = ".".join(modules_root_path.parts)
 
-        module = package.split(".")
-        while module and not (modules_root_path / "/".join(module)).is_dir():
-            module.pop()
-        module = ".".join(module)
+        _mod_path = mod_path.split(".")
+        while _mod_path and not (modules_root_path / "/".join(_mod_path)).is_dir():
+            _mod_path.pop()
+        pkg_path = ".".join(_mod_path) or mod_path
 
-        _import_module = modules_root + "." + (module if module else package)
-        _import_package = modules_root + "." + package
-        self._module_name = module if module else package
-        self._import_module_name = _import_module
-        # self._import_module_name = _import_package
+        module_path_prefix = ".".join(modules_root_path.parts)
+        plugin_import_name = module_path_prefix + "." + mod_path
+        self._module_name = pkg_path
+        self._import_module_name = mod_name = module_path_prefix + "." + pkg_path
 
         author = info.authors[0] if info.authors else "unknown"
-        log.debug("Loading %s v%s by %s (module: %s)", info.name, info.version, author, self._module_name)
+        log.debug("Loading %s v%s by %s (module: %s)", info.name, info.version, author, pkg_path)
 
-        # load module (or package)
-        import_module_from_file_location(_import_module, self.module_directory)
-        # load package
-        mod = importlib.import_module(_import_package)
+        mod = import_module_from_file_location(mod_name, self.module_directory)
+        sys.modules[mod_name] = mod
+        if mod_name != plugin_import_name:
+            mod = importlib.import_module(plugin_import_name, mod_name)
         return getattr(mod, clazz)
 
     def get_module_name(self):
@@ -477,6 +474,7 @@ class PluginZipFileLoader(PluginLoader):
         self._module_name = None  # type: Optional[str]
         self._import_module_name = None
         self._importer = None  # type: zipimport.zipimporter | None
+        self._virtual_importer = None  # type: VirtualZipImporter | None
         try:
             # noinspection PyUnresolvedReferences
             self.__zip_directory_cache = zipimport._zip_directory_cache
@@ -493,35 +491,32 @@ class PluginZipFileLoader(PluginLoader):
         if info.target_dncore:
             core_ver = get_core().version
             if info.target_dncore > core_ver:
-                raise PluginRequirementsError(f"非対応バージョンです (v{info.target_dncore}] <= v{core_ver.numbers})")
+                raise PluginRequirementsError(f"非対応バージョンです (v{info.target_dncore} <= v{core_ver.numbers})")
 
-        # packageとmodule単語の使い方が逆。いつか直す
         main = info.main  # testplugin.testplugin.TestPlugin
-        package = main[:main.rindex(".")]  # testplugin.testplugin
+        mod_path = main[:main.rindex(".")]  # testplugin.testplugin
         clazz = main[main.rindex(".")+1:]  # TestPlugin
-        modules_root = ".".join(modules_root_path.parts)  # dncore.extensions
 
-        self._importer = zipimport.zipimporter(str(self.plugin_file))
+        self._importer = zip_loader = zipimport.zipimporter(str(self.plugin_file))
 
-        _sp = package.count(".")
-        for i in range(_sp + 1):
-            module = ".".join(package.split(".")[: i or None])
-            if mod_spec := self._importer.find_spec(module):
+        for i in range(mod_path.count(".") + 1):
+            pkg_path = ".".join(mod_path.split(".")[: i or None])  # testplugin
+            if self._importer.find_spec(pkg_path):
                 break
         else:
-            raise Exception(f"Cannot find module: {package}")
+            raise Exception(f"Cannot find module: {mod_path}")
 
-        _import_package = modules_root + "." + package
-        _import_module = modules_root + "." + module
-        self._module_name = module if module else package
-        self._import_module_name = _import_module
+        module_path_prefix = ".".join(modules_root_path.parts)  # dncore.extensions
+        self._module_name = pkg_path
+        self._import_module_name = module_path_prefix + "." + pkg_path  # dncore.extensions.testplugin
 
         author = info.authors[0] if info.authors else "unknown"
-        log.debug("Loading %s v%s by %s (module: %s)", info.name, info.version, author, self._module_name)
+        log.debug("Loading %s v%s by %s (module: %s)", info.name, info.version, author, pkg_path)
 
-        # load module (or package)
-        import_module_from_spec(_import_package, mod_spec)
-        mod = importlib.import_module(_import_package)
+        self._virtual_importer = v_importer = VirtualZipImporter(zip_loader, module_path_prefix)
+        sys.meta_path.append(v_importer)
+        mod = importlib.import_module(module_path_prefix + "." + mod_path)
+
         return getattr(mod, clazz)
 
     def get_module_name(self):
@@ -655,6 +650,9 @@ class PluginZipFileLoader(PluginLoader):
             name = str(self.plugin_file)
             [sys.path_importer_cache.pop(mod)
              for mod in list(sys.path_importer_cache.keys()) if mod.startswith(name)]
+
+        if (v_importer := self._virtual_importer) and v_importer in sys.meta_path:
+            sys.meta_path.remove(v_importer)
 
         try:
             if self._importer:
