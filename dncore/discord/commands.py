@@ -167,16 +167,18 @@ class DNCoreCommands(EventListener):
                 else:
                     delete_users = False
 
-                fs = []
-
+                count = 0
                 if isinstance(channel, discord.abc.Messageable):
                     async with ctx.typing():
                         async for message in channel.history(limit=search_range):
                             if (delete_users or message.author == get_core().client.user) and _check(message):
-                                fs.append(get_core().loop.create_task(message.delete()))
-                    if fs:
-                        await asyncio.wait(fs)
-                count = len(fs)
+                                try:
+                                    await message.delete()
+                                except discord.HTTPException:
+                                    if count == 0:
+                                        raise
+
+                                count += 1
 
         except discord.HTTPException as e:
             return Embed.error(self.lang.clean.error).format(args=dict(message=str(e)))
