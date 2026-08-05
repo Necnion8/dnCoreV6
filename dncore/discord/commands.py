@@ -78,7 +78,7 @@ class DNCoreCommands(EventListener):
     def data(self):
         return get_core().data
 
-    @oncommand(defaults=True, category="utility", allow_channels=discord.TextChannel | discord.DMChannel)
+    @oncommand(defaults=True, category="utility", allow_channels=discord.abc.Messageable)
     async def cmd_help(self, ctx: CommandContext):
         """
         {command} [コマンド] [..引数]
@@ -123,7 +123,7 @@ class DNCoreCommands(EventListener):
             discord_version=discord.__version__,
         ))
 
-    @oncommand(defaults=True, category="utility", allow_channels=discord.TextChannel | discord.DMChannel)
+    @oncommand(defaults=True, category="utility", allow_channels=discord.abc.Messageable)
     async def cmd_clean(self, ctx: CommandContext):
         """
         {command} [件数]
@@ -151,7 +151,12 @@ class DNCoreCommands(EventListener):
 
         try:
             try:
-                if not isinstance(channel, discord.TextChannel):
+                if not isinstance(channel, (
+                        discord.TextChannel,
+                        discord.Thread,
+                        discord.VoiceChannel,
+                        discord.StageChannel,
+                )):  # purgeできないチャンネルを弾く
                     raise RuntimeError
 
                 async with ctx.typing():
