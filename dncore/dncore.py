@@ -6,7 +6,7 @@ import signal
 import sys
 import time
 from pathlib import Path
-from typing import Optional, Callable, TypeVar, Sequence
+from typing import Optional, Callable, TypeVar, Sequence, Awaitable
 
 import aiohttp
 import colorlog
@@ -536,20 +536,16 @@ class DNCoreAPI:
         return mgr.loop.create_task(mgr.call_event(event))
 
     @classmethod
-    def run_coroutine(cls, coro: T, ignores: Sequence[type[Exception]] | None = None) -> asyncio.Task[T]:
+    def run_coroutine(cls, coro: Awaitable[T], ignores: Sequence[type[Exception]] | None = None) -> asyncio.Task[T]:
         __ignore_frame = IGNORE_FRAME
         loop = get_core().loop
-
-        if ignores is None:
-            ignores = Exception
 
         async def _wrap():
             try:
                 return await coro
-            except ignores:
-                return None
-            except (Exception,):
-                get_caller_logger().exception(f"Exception in run_coroutine : {coro}")
+            except Exception as e:
+                if not ignores or not isinstance(e, tuple(ignores)):
+                    get_caller_logger().exception(f"Exception in run_coroutine : {coro}", exc_info=e)
 
         return loop.create_task(_wrap())
 
