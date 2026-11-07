@@ -107,7 +107,7 @@ class Duration(object):
     def empty(cls):
         return cls(None)
 
-    def __init__(self, seconds: int | None):
+    def __init__(self, seconds: int | float | None):
         self.total_seconds = seconds or 0
         self.null = seconds is None
 

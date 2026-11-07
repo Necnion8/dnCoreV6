@@ -247,6 +247,8 @@ class Embed(ObjectSerializable, Cloneable, discord.Embed):
         serialized = self.to_dict()  # type: dict[str, Any]
         if serialized.get("type") == "rich":
             serialized.pop("type")
+        if serialized.get("flags") == 0:
+            serialized.pop("flags")
         if simple and len(serialized) == 1 and "description" in serialized:
             return self.description
         if "color" in serialized:
