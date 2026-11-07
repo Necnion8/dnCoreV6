@@ -47,6 +47,7 @@ class DNCore(object):
         self._init = False
         self._default_intents = discord.Intents.presences.flag
         self._last_shutdown_time = 0
+        self._shutdown_task = None  # type: asyncio.Task | None
         self.config_dir = Path(config_dir)
         self.plugins_dir = Path(plugins_dir)
         self.conn_act = None  # type: Optional[Activity]
@@ -183,7 +184,7 @@ class DNCore(object):
 
         return True
 
-    async def shutdown(self, *, restart=False):
+    async def shutdown(self, *, restart=False, suppress_running=False):
         last_time = self._last_shutdown_time
         if last_time:
             if time.time() - last_time > 6:
@@ -192,8 +193,14 @@ class DNCore(object):
         else:
             self._last_shutdown_time = time.time()
 
+        if self._shutdown_task and not self._shutdown_task.done():
+            if suppress_running:
+                return
+            raise RuntimeError("Already running shutdown task")
+
+        self._shutdown_task = task = asyncio.create_task(self._shutdown(restart=restart))
         try:
-            await self._shutdown(restart=restart)
+            await task
 
         finally:
             self.loop.stop()
@@ -244,17 +251,26 @@ class DNCore(object):
         finally:
             pending = [
                 t for t in asyncio.all_tasks(loop=self.loop)
-                if t is not asyncio.current_task(loop=self.loop) and not t.done()
+                if t is not asyncio.current_task() and not t.done()
             ]
             log.debug("Stopping %s tasks", len(pending))
             for task in pending:
                 task.cancel()
+
+            if pending:
                 try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
-                except (Exception,):
-                    log.warning("Failed to cancel pending task", exc_info=True)
+                    results = await asyncio.wait_for(
+                        asyncio.gather(*pending, return_exceptions=True),
+                        timeout=60,
+                    )
+                    for task, result in zip(pending, results):
+                        if isinstance(result, Exception) and not isinstance(result, asyncio.CancelledError):
+                            log.warning(
+                                "Task %s failed with exception during shutdown",
+                                task.get_name(), exc_info=result,
+                            )
+                except asyncio.TimeoutError:
+                    log.error("Shutdown timed out, some tasks failed to finish gracefully.")
 
     async def _empty(self):
         while True:
@@ -263,7 +279,7 @@ class DNCore(object):
     def _signals(self):
         def on_signal(s, _):
             log.debug("received %s signal", s)
-            self.loop.create_task(self.shutdown())
+            self.loop.create_task(self.shutdown(suppress_running=True))
 
         signal.signal(signal.SIGINT, on_signal)
         signal.signal(signal.SIGTERM, on_signal)
